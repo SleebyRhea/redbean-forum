@@ -1,0 +1,3 @@
+[submodule "libs/fullmoon"]
+	path = libs/fullmoon
+	url = https://github.com/pkulchenko/fullmoon
