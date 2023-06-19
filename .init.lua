@@ -1,12 +1,31 @@
----@param client_addr integer
----@param client_port integer
----@param server_addr integer
----@param server_port integer
-OnClientConnection = function (client_addr, client_port, server_addr, server_port)
+local fm = require("fullmoon")
+local const = require("constants")
+local GET, POST, PUSH = fm.GET, fm.POST, fm.PUSH
+
+fm.setTemplate({ "/tmpl/", fmt = "fmt" })
+fm.setRoute("*", "/assets/*")
+
+do --[[ /v1/user ]]--
+  local uapi = require("api.user").api
+  fm.setRoute(GET("/v1/user/authenticate"), uapi.get.authenticate)
+  fm.setRoute(GET("/v1/user"), uapi.get.self)
+  fm.setRoute(GET({"/v1/user/:uuid", uuid = {regex = const.uuid_regex}}), uapi.get.by_uuid)
+  fm.setRoute(GET({"/v1/user/:email", email = {regex = const.email_regex}}), uapi.get.by_email)
+  fm.setRoute(GET("/v1/user/:name"), uapi.get.by_name)
+
+  fm.setRoute(POST("/v1/user/register"), uapi.post.register)
+  -- fm.setRoute(PUSH("/v1/user/:field"), uapi.push)
 end
 
-OnServerStart = function ()
+do --[[ /v1/post ]]--
+  local papi = require("api.post")
+  -- fm.setRoute(GET("/v1/thread/list", papi.get.list))
+  -- fm.setRoute(GET("/v1/thread/:uuid"), papi.get.uuid)
+  -- fm.setRoute(GET("/v1/thread/search"), papi.get.list)
+
+  -- fm.setRoute(POST("/v1/thread/:uuid/comment"), papi.post)
+  -- fm.setRoute(POST)
+
 end
 
-OnServerStop = function ()
-end
+fm.run()
