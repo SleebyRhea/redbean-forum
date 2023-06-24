@@ -5,15 +5,18 @@
 ---@field name       string
 
 local fm = require("fullmoon")
+local need = require("lib.need")
 local const = require("constants")
 local new_uuid = require("lib.uuid").new
 local context = require("context").new
+local database = require("lib.database")
 local json_response = require("api.data").json_response
 local validate = require("lib.validation").validate
 local api = { get = {}, push = {}, post = {} }
 
 do
-  local db <close> = fm.makeStorage(const.db_name, [[
+  local db = database.get(unix.getpid(), const.db_name)
+  db:execute([[
     CREATE TABLE IF NOT EXISTS users (
       id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
       uuid        TEXT      NOT NULL      UNIQUE,
@@ -129,7 +132,7 @@ local user_by_uuid = function (uuid)
 
   local id, created_on, name, email, email_visible
   do
-    local db <close> = fm.makeStorage(const.db_name)
+    local db = database.get(unix.getpid(), const.db_name)
     local result = db:fetchOne(select_userdata_query_by_uuid, uuid)
     if not result or not result.id then
       return nil
@@ -159,7 +162,7 @@ local user_by_name = function (name)
 
   local id, created_on, uuid, email
   do
-    local db <close> = fm.makeStorage(const.db_name)
+    local db = database.get(unix.getpid(), const.db_name)
 
     local result = db:fetchOne(select_userdata_query_by_name, name)
     if not result or not result.id then
@@ -195,10 +198,6 @@ end
 ---@return boolean
 ---@return string?
 local create_user = function (username, email, password)
-  assert(type(username) == "string", "create_user: arg 1 must be a string")
-  assert(type(email) == "string", "create_user: arg 2 must be a string")
-  assert(type(password) == "string", "create_user: arg 3 must be a string")
-
   do
     local ok, err = validate("email", email)
     if not ok then
@@ -219,7 +218,7 @@ local create_user = function (username, email, password)
   end
 
   do
-    local db <close> = fm.makeStorage(const.db_name)
+    local db = database.get(unix.getpid(), const.db_name)
     local uuid = new_uuid()
     local hash = argon2.hash_encoded(password, EncodeBase64(GetRandomBytes(32)))
     local user_id = -1
@@ -255,6 +254,7 @@ local update_user
 do
   local handlers = {}
 
+
   handlers.username = function (db, uuid, value)
     do
       local ok, err = validate("username", value)
@@ -271,6 +271,7 @@ do
 
     return true
   end
+
 
   handlers.password = function (db, uuid, value)
     do
@@ -290,15 +291,17 @@ do
     return true
   end
 
+
   handlers.email = function (db, uuid, value)
     local _, err = db:execute(update_usersettings_query, "email", value, uuid)
 
-    if not err then
+    if err then
       return false, err
     end
 
     return true
   end
+
 
   ---Update a user value
   ---@param uuid string
@@ -312,7 +315,7 @@ do
       return false, "invalid field"
     end
 
-    local db <close> = fm.makeStorage(const.db_name)
+    local db = database.get(unix.getpid(), const.db_name)
 
     local ok, err = handler(db, uuid, value)
     if not ok then
@@ -386,8 +389,6 @@ do -- [[ GET methods ]]
   end
 
 
-  ---@param login any
-  ---@param password any
   ---@return unknown
   local authenticate = function (req)
     local user --[[@as User]]
@@ -419,7 +420,7 @@ do -- [[ GET methods ]]
       return json_response(403, "unauthorized")
     end
 
-    local db <close> = fm.makeStorage(const.db_name)
+    local db = database.get(unix.getpid(), const.db_name)
     local result = db:fetchOne(select_userauth_query_by_id, id)
     if not result then
       return json_response(403, "unauthorized")
@@ -489,8 +490,8 @@ end
 
 return {
   api = api,
-  user_by_uuid = user_by_uuid,
-  user_by_name = user_by_name,
   require_auth = require_auth,
-  create_user = create_user,
+  user_by_uuid = need(user_by_uuid, "string"),
+  user_by_name = need(user_by_name, "string"),
+  create_user = need(create_user, "string", "string", "string"),
 }

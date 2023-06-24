@@ -1,3 +1,5 @@
+local need = require("lib.need")
+
 ---@type {string:fun(input: any): boolean, string?}
 local validators = {}
 do
@@ -61,5 +63,5 @@ local validate = function (kind, input)
 end
 
 return {
-  validate = validate
+  validate = need(validate, "string")
 }

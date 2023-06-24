@@ -47,7 +47,7 @@ build ()
     done < <(cat .fetch <(echo "\n"))
   fi
 
-  zip -r "$filename" "${files[@]}" || error "failed to zip"
+  zip.com -r "$filename" "${files[@]}" || error "failed to zip"
   printf "\nGenerated %s\n" "$filename"
   chmod +x "$filename" || exit 1
 }

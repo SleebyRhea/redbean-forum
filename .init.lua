@@ -1,9 +1,18 @@
 local fm = require("fullmoon")
 local const = require("constants")
+local database = require("lib.database")
 local GET, POST, PUSH = fm.GET, fm.POST, fm.PUSH
 
 fm.setTemplate({ "/tmpl/", fmt = "fmt" })
 fm.setRoute("*", "/assets/*")
+
+OnWorkerStart = function ()
+  database.create(unix.getpid(), const.db_name)
+end
+
+OnWorkerStop = function ()
+  database.close_all(unix.getpid())
+end
 
 do --[[ /v1/user ]]--
   local uapi = require("api.user").api
