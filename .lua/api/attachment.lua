@@ -1,19 +1,22 @@
-local fm = require("fullmoon")
-local ulib = require("lib.uuid").new
-local const = require("constants")
-local need = require("lib.need")
+local fm = require("lib.external.fullmoon")
 local get = require("lib.config").get
+local log = require("lib.logging")
+local ulib = require("lib.uuid").new
+local need = require("lib.need")
+local const = require("constants")
 local database = require("lib.database")
 
 local cAttachmentsEnabled = "attachments.enabled"
 local cAttachmentsUploadPath = "attachments.upload_filepath"
 local cAttachmentsMaxUploadSize = "attachments.max_upload_size"
+local cAttachmentsCleanupSchedule = "attachments.cleanup_schedule"
 
 do
   local register_cfg = require("lib.config").register
   register_cfg(cAttachmentsEnabled, true)
   register_cfg(cAttachmentsUploadPath, "uploads")
   register_cfg(cAttachmentsMaxUploadSize, 50 * 1024 * 1024) -- 50MB default
+  register_cfg(cAttachmentsCleanupSchedule, "*/30 * * * *")
 end
 
 do
@@ -24,7 +27,9 @@ do
       uuid          TEXT      NOT NULL,
       post_id       INTEGER   NOT NULL,
       filename      TEXT      NOT NULL,
-      description   TEXT
+      description   TEXT,
+
+      FOREIGN KEY(post_id) REFERENCES threads(id),
     );
   ]])
 end
@@ -42,13 +47,26 @@ local delete_attachment <const> = [[
     uuid = ?;
 ]]
 
+local fetch_orphaned_attachments <const> = [[
+  SELECT
+    l.id   AS id,
+    l.uuid AS uuid
+  FROM
+    attachments AS l
+  INNER JOIN posts AS r ON
+    1 = 1 // lol
+  WHERE EXISTS (
+    SELECT * FROM posts r WHERE l.post_id = r.id
+  );
+]]
+
 
 -- TODO: replace this with a call to errors.lua
 local error_logger
 do
   local traceback = debug.traceback
   error_logger = function ()
-    Log(kLogError, traceback())
+    log.error(traceback())
   end
 end
 
@@ -76,15 +94,26 @@ local save_attachment = function (uuid, post_id, data)
 
   ok, err = unix.write(fd, data)
   if not ok then
-    Log(kLogError, err)
+    log.error(err)
     error("internal server error")
   end
 end
 
 
-local wipe_attachment = function ()
+---@param post_id number
+---@param uuid string
+---@return boolean
+---@return string
+local remove_attachment = function (post_id, uuid)
+  local upload_path = get(cAttachmentsUploadPath .. "/" .. tostring(post_id) .. "/" .. uuid)
+  local ok, err = unix.rmrf(upload_path)
+  if not ok then
+    return false, err
+  end
 
+  return true
 end
+
 
 -- TODO: since adding attachments to the zip itself could be problematic
 -- (if convenient) it would be a better idea to just store files in a
@@ -125,7 +154,7 @@ end
 ---@return boolean
 ---@return string?
 local delete = function (uuid)
-  local db <const> = fm.makeStorage(const.db_name)
+  local db = database.get(unix.getpid(), const.db_name)
   local changes, err = db:execute(delete_attachment)
   if not changes or changes < 1 then
     return nil, err
@@ -134,13 +163,38 @@ local delete = function (uuid)
   return true
 end
 
--- fm.setSchedule("*/30 * * * *", function ()
---   Log(kLogInfo, "Checking for orphaned attachments ...")
---   local db <close> = fm.makeStorage(const.db_name)
---   local rows = db:fetchAll([[ //Sql Statement Here ]])
--- end)
+
+do
+  local pid = unix.getpid()
+  local ppid = unix.getppid()
+
+  if pid == ppid then
+    local fmt = string.format
+    local w_attachments = require("lib.plurals")("attachment", "attachments")
+    fm.setSchedule(get(cAttachmentsCleanupSchedule), function ()
+      log.info("Checking for orphaned attachments ...")
+
+      local db = database.get(unix.getpid(), const.db_name)
+      local results = db:fetchAll(fetch_orphaned_attachments)
+
+      local count = 0
+      for _, row in ipairs(results) do
+        delete(row.uuid)
+        local changes = db:execute([[ DELETE FROM attachments WHERE id = ?; ]], row.id)
+        count = count + changes
+      end
+
+      log.info(fmt("attachment cleanup : removed %d %s", count, w_attachments(count)))
+    end)
+  end
+end
 
 return {
   add    = need(add, "number", "string", "string", "string?"),
-  delete = need(delete, "string")
+  delete = need(delete, "number", "string"),
+
+  cAttachmentsEnabled = cAttachmentsEnabled,
+  cAttachmentsUploadPath = cAttachmentsUploadPath,
+  cAttachmentsMaxUploadSize = cAttachmentsMaxUploadSize,
+  cAttachmentsCleanupSchedule = cAttachmentsCleanupSchedule,
 }

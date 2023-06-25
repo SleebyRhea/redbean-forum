@@ -1,4 +1,4 @@
-local fm = require("fullmoon")
+local fm = require("lib.external.fullmoon")
 
 ---@generic T
 ---@param wrapped_handler T

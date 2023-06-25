@@ -4,7 +4,7 @@
 ---@field uuid       string
 ---@field name       string
 
-local fm = require("fullmoon")
+local fm = require("lib.external.fullmoon")
 local need = require("lib.need")
 local const = require("constants")
 local new_uuid = require("lib.uuid").new
@@ -13,6 +13,14 @@ local database = require("lib.database")
 local json_response = require("api.data").json_response
 local validate = require("lib.validation").validate
 local api = { get = {}, push = {}, post = {} }
+local register_cfg = require("lib.config").register
+local get = require("lib.config").get
+
+local cUserPasswordRegex = "user.password_regex"
+
+do
+  register_cfg(cUserPasswordRegex, "")
+end
 
 do
   local db = database.get(unix.getpid(), const.db_name)
@@ -29,7 +37,9 @@ do
       name          TEXT      NOT NULL      UNIQUE,
       auth          TEXT      NOT NULL,
       email         TEXT      NOT NULL      UNIQUE,
-      email_visible INTEGER   NOT NULL
+      email_visible INTEGER   NOT NULL,
+
+      FOREIGN KEY(author_id) REFERENCES users(id),
     );
   ]])
 end
@@ -82,12 +92,12 @@ local select_userauth_query_by_id <const> = [[
 
 local select_userdata_query_by_uuid <const> = [[
   SELECT
-    l.id            AS id,
-    l.uuid          AS uuid,
-    r.name          AS name,
-    r.email         AS email,
-    r.email_visible AS email_visible,
-    l.created_on    AS created_on
+    l.id              AS id,
+    l.uuid            AS uuid,
+    r.name            AS name,
+    r.email           AS email,
+    r.email_visible   AS email_visible,
+    l.created_on      AS created_on
   FROM
     users l
   INNER JOIN user_settings r ON
@@ -99,12 +109,12 @@ local select_userdata_query_by_uuid <const> = [[
 
 local select_userdata_query_by_name <const> = [[
   SELECT
-    l.id            AS id,
-    l.uuid          AS uuid,
-    r.name          AS name,
-    r.email         AS email,
-    r.email_visible AS email_visible,
-    l.created_on    AS created_on
+    l.id              AS id,
+    l.uuid            AS uuid,
+    r.name            AS name,
+    r.email           AS email,
+    r.email_visible   AS email_visible,
+    l.created_on      AS created_on
   FROM
     users l
   INNER JOIN user_settings r ON
@@ -316,7 +326,6 @@ do
     end
 
     local db = database.get(unix.getpid(), const.db_name)
-
     local ok, err = handler(db, uuid, value)
     if not ok then
       return false, err

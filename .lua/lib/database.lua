@@ -1,4 +1,4 @@
-local fm = require("fullmoon")
+local fm = require("lib.external.fullmoon")
 
 local handles = {}
 

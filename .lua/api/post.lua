@@ -3,7 +3,7 @@ local context = require("context").new
 local const = require("constants")
 local user = require("api.user")
 local need = require("lib.need")
-local fm = require("fullmoon")
+local fm = require("lib.external.fullmoon")
 
 local api = {
   get  = { directory = {}, thread = {}, post = {} },
@@ -17,7 +17,10 @@ do
     CREATE TABLE IF NOT EXISTS directory (
       id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
       name        TEXT      NOT NULL,
-      parent_id   INTEGER
+      parent_id   INTEGER,  // the parent directory id is used to allow directories
+                            // to be a child of another directory. if there is no
+                            // parent_id (parent_id = NULL) then it is in the root
+                            // of the directory tree
     );
 
     CREATE TABLE IF NOT EXISTS threads (
@@ -27,7 +30,10 @@ do
       author_id     TEXT      NOT NULL,
       created_on    INTEGER   NOT NULL,
       updated_on    INTEGER   NOT NULL,
-      directory_id  INTEGER   NOT NULL
+      directory_id  INTEGER   NOT NULL,
+
+      FOREIGN KEY(author_id) REFERENCES users(id),
+      FOREIGN KEY(directory_id) REFERENCES directory(id),
     );
 
     CREATE TABLE IF NOT EXISTS posts (
@@ -36,13 +42,20 @@ do
       body        TEXT      NOT NULL,
       thread_id   INTEGER   NOT NULL,
       author_id   INTEGER   NOT NULL,
-      extra_data  TEXT
+      extra_data  TEXT,
+
+      FOREIGN KEY(author_id) REFERENCES users(id),
+      FOREIGN KEY(thread_id) REFERENCES threads(id),
     );
 
     CREATE TABLE IF NOT EXISTS reactions (
       id          INTEGER   PRIMARY KEY  AUTOINCREMENT,
+      post_id     INTEGER   NOT NULL,
       author_id   INTEGER   NOT NULL,
-      emoji       TEXT
+      emoji       TEXT,
+
+      FOREIGN KEY(author_id) REFERENCES users(id),
+      FOREIGN KEY(post_id) REFERENCES threads(id),
     );
   ]])
 end

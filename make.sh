@@ -1,116 +1,50 @@
-#!/bin/bash
+#!/bin/sh
 
-declare APPNAME='Redbean Forum POC' curl
+want="$1" ; name="$2" ; shift 2
+donor="$( which "$want" )"
 
-if command -v curl.com >/dev/null >&1
-  then curl=curl.com
-  else curl=curl
-fi
+error ()
+{
+  printf '%s\n' "$1"
+  exit 1
+}
 
-error () { echo "$1" >&2; exit 1; }
-
-__fetch ()
+fetch ()
 {
   test -f "$1" && return 0
-  echo "  curled:  ${1} ($2)"
-  "$curl" "$2" > "$1" 2>/dev/null
+  mkdir -p "$(dirname "$1")" || return 1
+  echo "  curled: '${2}' -> '${1}'"
+  curl.com "$2" > "$1" 2>/dev/null
 }
 
+get_lines ()
+{ # this is done via a grep, so as using while < $file will skip the last line if there is no trailing line
+  grep '[\r\n]*$' "$1" | grep -v '^[:space]*$'
+}
 
-build ()
+prepare ()
 {
-  local latest filename="$1"
-  latest="$(curl https://redbean.dev/latest.txt 2>/dev/null)"
-
-  if ! test -f redbean-"${latest}".com
-    then if ! curl -o redbean-"${latest}".com "https://redbean.dev/redbean-${latest}.com"
-      then error "Failed to fetch latest redbean.com"
-    fi
-  fi
-
-  test -f "$filename" && rm "$filename"
-  cp redbean-"${latest}".com "$filename"
-
-  local -a files=( "$filename" )
-
-  test -f .init.lua     && files+=( .init.lua )
-  test -f .args         && files+=( .args )
-  test -f .redbean.png  && files+=( .redbean.png )
-  test -f .reload.lua   && files+=( .reload.lua )
-  test -f index.lua     && files+=( index.lua )
-  test -f index.html    && files+=( index.html )
-  test -d .lua          && files+=( .lua )
+  test -n "$want"                     || error "error: please provide a target pkzip binary"
+  command -v "$want" >/dev/null 2>&1  || error "error: ${want} is not in path"
+  test -f "$want"                     && rm "$want"
+  test -f "$name"                     && rm "$name"
 
   if test -f .fetch
-    then while read -r file url
-      do __fetch "$file" "$url" || exit 1
-    done < <(cat .fetch <(echo "\n"))
+  then get_lines .fetch | while read -r file url
+      do fetch "$file" "$url" || exit 1
+    done
   fi
-
-  zip.com -r "$filename" "${files[@]}" || error "failed to zip"
-  printf "\nGenerated %s\n" "$filename"
-  chmod +x "$filename" || exit 1
 }
 
-clean ()
-{
-  rm redbean-*.com
-  rm "$1"
-  return 0
-} >/dev/null 2>&1
+for need in "$want" curl.com zip.com cp mv echo test
+  do command -v "$need" >/dev/null 2>&1 || error "missing requirement: ${need}"
+done
 
-
-setup ()
-{
-  __fetch definitions.lua "https://raw.githubusercontent.com/jart/cosmopolitan/master/tool/net/definitions.lua"
-}
-
-run () {
-  unset LUA_PATH
-  unset LUA_CPATH
-  local file="$1"
-  shift
-  ./"$file" "$@"
-}
-
-help()
-{
-  cat << HELP
-make.sh
-  Just a simple build script for redbean applications
-
-Commands
-  build (default)   Build a redbean application
-  setup             Setup definitions.lua
-  clean             Clean build directory
-  help              This help text
-  run               Run application
-HELP
-  return 0
-}
-
-main ()
-{
-  local filename command
-  filename="$(printf '%s' "${APPNAME}" | tr '[:upper:]' '[:lower:]')"
-  filename="${filename// /_}.com"
-  command="${1:-build}"
-  shift
-  case $command in
-    (setup) setup ; exit $?
-      ;;
-    (build) build "$filename" ; exit $?
-      ;;
-    (clean) clean "$filename" ; exit $?
-      ;;
-    (run) build "$filename" && run "$filename" "$@"|| exit $?
-      ;;
-    (*) help && exit $?
-      ;;
-  esac
-}
-
-export -f error
-
-main "$@"
-
+echo "Making $name from ${want}"    \
+  && prepare                        \
+  && cp "$donor" "${want}.zip"      \
+  && zip.com -r "${want}.zip" "$@"  \
+  && mv "${want}.zip" "${name}"     \
+  && echo Done                      \
+  && exit 0
+error "Failed to package ${name}"
