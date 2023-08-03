@@ -9,10 +9,11 @@ local push, pop = table.insert, table.remove
 local json_response = require("api.data").json_response
 
 local api = {
-  get   = { directory = {}, thread = {}, post = {} },
-  post  = { directory = {}, thread = {}, post = {} },
-  push  = { directory = {}, thread = {}, post = {} },
-  patch = { directory = {}, thread = {}, post = {} },
+  get    = { directory = {}, thread = {}, post = {} },
+  post   = { directory = {}, thread = {}, post = {} },
+  push   = { directory = {}, thread = {}, post = {} },
+  patch  = { directory = {}, thread = {}, post = {} },
+  delete = { directory = {}, thread = {}, post = {} },
 }
 
 do
