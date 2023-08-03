@@ -1,16 +1,15 @@
 local fm = require("lib.external.fullmoon")
 
----@generic T
----@param wrapped_handler T
----@return context
-local new_context = function (wrapped_handler)
-  local call_handler = wrapped_handler
+---@param wrapped_handler fun(req:table): any
+local new = function (wrapped_handler)
 
   ---@class context
-  local self = {}
+  local self
 
-  ---set validators for a specific type of data to be checked upon visit
-  ---@return context
+  self.get_handler = function ()
+    return wrapped_handler
+  end
+
   self.need_cookie = function (tbl)
     local validators = {}
 
@@ -23,8 +22,8 @@ local new_context = function (wrapped_handler)
       end)
     end
 
-    local old_handler = call_handler
-    call_handler = function (req)
+    local old_handler = wrapped_handler
+    wrapped_handler = function (req)
       for _, validator in ipairs(validators) do
         validator(req)
       end
@@ -34,11 +33,9 @@ local new_context = function (wrapped_handler)
     return self
   end
 
-  ---@param validator fun(req:table):any
-  ---@return context
-  self.must_pass = function (validator)
-    local old_handler = call_handler
-    call_handler = function (req)
+   self.must_pass = function (validator)
+    local old_handler = wrapped_handler
+    wrapped_handler = function (req)
       local ok, code, message = validator(req)
       if not ok then
         error(fm.serveError(code, message))
@@ -47,13 +44,9 @@ local new_context = function (wrapped_handler)
     return self
   end
 
-  self.init = function ()
-    return call_handler
-  end
-
   return self
 end
 
 return {
-  new = new_context
+  new = new
 }

@@ -222,7 +222,6 @@ local create_user = function (username, email, password)
     end
   end
 
-
   if user_by_name(username) or user_by_email(email) then
     return false, "user exists"
   end
@@ -447,10 +446,10 @@ do -- [[ GET methods ]]
     return json_response(200, "success")
   end
 
-  api.get.self = context(want_self).must_pass(require_auth).init()
-  api.get.by_uuid = context(by_uuid).must_pass(require_auth).init()
-  api.get.by_name = context(by_name).must_pass(require_auth).init()
-  api.get.by_email = context(by_email).must_pass(require_auth).init()
+  api.get.self = context(want_self).must_pass(require_auth).get_handler()
+  api.get.by_uuid = context(by_uuid).must_pass(require_auth).get_handler()
+  api.get.by_name = context(by_name).must_pass(require_auth).get_handler()
+  api.get.by_email = context(by_email).must_pass(require_auth).get_handler()
   api.get.authenticate = authenticate
 end
 
@@ -471,7 +470,7 @@ do --[[ POST methods ]]
     end
   end
 
-  api.post.register = context(register_user).init()
+  api.post.register = context(register_user).get_handler()
 end
 
 
@@ -493,9 +492,8 @@ do --[[ PUSH methods ]]
     return json_response(200, "success")
   end
 
-  api.push.update = context(update).must_pass(require_auth).init()
+  api.push.update = context(update).must_pass(require_auth).get_handler()
 end
-
 
 return {
   api = api,
