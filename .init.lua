@@ -1,6 +1,6 @@
 local fm = require("lib.external.fullmoon")
-local const = require("constants")
 local get = require("lib.config").get
+local const = require("constants")
 local database = require("lib.database")
 local handlers = require("lib.handlers")
 local GET, POST, PUSH = fm.GET, fm.POST, fm.PUSH
@@ -23,13 +23,10 @@ end
 
 do --[[ /v1/post ]]--
   local papi = require("api.post")
-  -- fm.setRoute(GET("/v1/thread/list", papi.get.list))
-  -- fm.setRoute(GET("/v1/thread/:uuid"), papi.get.uuid)
-  -- fm.setRoute(GET("/v1/thread/search"), papi.get.list)
-
-  -- fm.setRoute(POST("/v1/thread/:uuid/comment"), papi.post)
-  -- fm.setRoute(POST)
-
+  fm.setRoute(GET("/v1/thread/list", papi.get.list))
+  fm.setRoute(GET("/v1/thread/:uuid"), papi.get.uuid)
+  fm.setRoute(GET("/v1/thread/search"), papi.get.list)
+  fm.setRoute(POST("/v1/thread/:uuid/comment"), papi.post)
 end
 
 do
