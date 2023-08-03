@@ -14,7 +14,6 @@ local json_response = require("api.data").json_response
 local validate = require("lib.validation").validate
 local api = { get = {}, push = {}, post = {} }
 local register_cfg = require("lib.config").register
-local get = require("lib.config").get
 
 local cUserPasswordRegex = "user.password_regex"
 
@@ -130,6 +129,11 @@ local require_auth = function (req)
   or (not type(req.session.context.user) == "table")
   then
     error(fm.serveError(403, "unauthorized"))
+  end
+end
+
+local require_admin = function (level)
+  return function (req)
   end
 end
 
@@ -498,6 +502,7 @@ end
 return {
   api = api,
   require_auth = require_auth,
+  require_admin = require_admin,
   user_by_uuid = need(user_by_uuid, "string"),
   user_by_name = need(user_by_name, "string"),
   create_user = need(create_user, "string", "string", "string"),
