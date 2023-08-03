@@ -1,9 +1,12 @@
 local database = require("lib.database")
+local validate = require("lib.validation").validate
 local context = require("context").new
 local const = require("constants")
 local user = require("api.user")
 local need = require("lib.need")
 local fm = require("lib.external.fullmoon")
+local push, pop = table.insert, table.remove
+local json_response = require("api.data").json_response
 
 local api = {
   get  = { directory = {}, thread = {}, post = {} },
@@ -79,6 +82,32 @@ local insert_reaction <const> = [[
   ) VALUES (?, ?);
 ]]
 
+local select_directories <const> = [[
+  SELECT
+    id, name, parent_id
+  FROM directory
+  OFFSET ?
+  LIMIT ?;
+]]
+
+local select_directory_by_id <const> = [[
+  SELECT
+    id, name, parent_id
+  FROM directory
+  WHERE
+    id = ?;
+]]
+
+local select_directories_by_parent <const> = [[
+  SELECT
+    id, name, parent_id
+  FROM directory
+  WHERE
+    parent_id = ?
+  OFFSET ?
+  LIMIT ?;
+]]
+
 local select_threads_by_author_id <const> = [[
   SELECT
     r.id        AS id,
@@ -107,24 +136,130 @@ local select_posts_by_thread_uuid <const> = [[
 ]]
 
 
+---@param id integer
+---@return Directory?
+---@return integer?
+local directory_by_id = function (id)
+  local name, parent_id
+
+  do
+    local db = database.get(unix.getpid(), const.db_name)
+    local result = db:fetchOne(select_directory_by_id, id)
+    if not result or not result.id then
+      return nil
+    end
+
+    name = tostring(result.name)
+    parent_id = tonumber(result.parent_id)
+  end
+
+  ---@class Directory
+  ---@field name string
+  ---@field parent_id integer?
+  return {
+    id = id,
+    name = name,
+    parent_id = parent_id
+  }, id
+end
+
+
+---@param parent_id integer
+---@param offset integer
+---@param limit integer
+---@return Directory[]
+local get_directory_by_parent = function (parent_id, offset, limit)
+  ---@type Directory[]
+  local directories = {}
+  local db = database.get(unix.getpid(), const.db_name)
+  local results = db:fetchAll(select_directories_by_parent, parent_id, offset, limit)
+
+  if not results or #results < 1 then
+    return directories
+  end
+
+  for _, row in ipairs(results) do
+    push(directories, {
+      id = tonumber(row.id),
+      parent_id = parent_id,
+      name = tostring(row.name),
+    })
+  end
+
+  return directories
+end
+
+---comment
+---@param offset integer
+---@param limit integer
+---@return Directory[]
+local get_directory_listing = function (offset, limit)
+  local directories = {}
+
+  local db = database.get(unix.getpid(), const.db_name)
+  local results = db:fetch(select_directories, offset, limit)
+
+  for _, row in ipairs(results) do
+    push(directories, {
+      id = tonumber(row.id),
+      parent_id = tostring(row.parent_id),
+      name = tostring(row.name),
+    })
+  end
+
+  return directories
+end
+
+local search_post_by_regex = function (query)
+  local regex = re.compile(query)
+end
+
+local search_post_by_description = function (query)
+
+end
+
 --
 -- DIRECTORIES
 --
 
 do --[[ GET methods ]]--
-  local directory_by_uuid = function (req)
-  end
-
-  local directory_by_name = function (req)
-  end
-
   local directory_list_all = function (req)
+    local offset = req.params.offset or 0
+    local limit = req.params.limit or 15
+
+    if offset and type(offset) ~= "number" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+    if limit and type(limit) ~= "number" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+     return json_response(200, get_directory_listing(offset, limit))
   end
 
-  api.get.directory.by_uuid = ''
-  api.get.directory.by_name = ''
-  api.get.directory.list_all = ''
+  local directory_list_by_parent = function (req)
+    local parent_id = req.params.parent_id
+    local offset = req.params.offset or 0
+    local limit = req.params.limit or 15
 
+    if not parent_id then
+      return json_response(400, "bad request")
+    end
+
+    if offset and type(offset) ~= "number" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+    if limit and type(limit) ~= "number" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+    return json_response(200, get_directory_by_parent(parent_id, offset, limit))
+  end
+
+  api.get.directory.list_all = context(directory_list_all).get_handler()
+  api.get.directory.list_by_parent = context(directory_list_by_parent).get_handler()
 end
 
 
@@ -133,10 +268,7 @@ end
 --
 
 do --[[ GET methods ]]--
-  local thread_by_name = function (req)
-  end
-
-  local thread_search_by_name = function (req)
+  local thread_search = function (req)
   end
 
   local thread_by_author_uuid = function (req)
@@ -148,15 +280,15 @@ do --[[ GET methods ]]--
   local thread_list_all_threads = function (req)
   end
 
-  api.get.thread.search = context(thread_search_by_name).must_pass(user.require_auth).init()
-  api.get.thread.by_uuid = context(thread_by_author_uuid).must_pass(user.require_auth).init()
-  api.get.thread.by_name = context(thread_by_name).must_pass(user.require_auth).init()
-  api.get.thread.list_all = context(thread_list_all_threads).must_pass(user.require_auth).init()
-  api.get.thread.list_by_author = context(thread_list_by_author).must_pass(user.require_auth).init()
+  api.get.thread.search = context(thread_search).get_handler()
+  api.get.thread.by_uuid = context(thread_by_author_uuid).must_pass(user.require_auth).get_handler()
+  api.get.thread.list_all = context(thread_list_all_threads).must_pass(user.require_auth).get_handler()
+  api.get.thread.list_by_author = context(thread_list_by_author).must_pass(user.require_auth).get_handler()
 end
 
 
 do --[[ POST methods ]]--
+
 
 end
 
@@ -166,9 +298,21 @@ end
 --
 
 do --[[ GET methods ]]--
+  local post_by_uuid = function (req)
+  end
 
+  local post_by_thread = function (req)
+  end
+
+  local post_list_by_author = function (req)
+  end
+
+  local post_search = function (req)
+  end
 end
 
 return {
   api = api,
+  get_directory_by_parent = need(get_directory_by_parent, "number", "number", "number"),
+  get_directory_listing = need(get_directory_listing, "number", "number")
 }
