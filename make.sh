@@ -13,8 +13,8 @@ fetch ()
 {
   test -f "$1" && return 0
   mkdir -p "$(dirname "$1")" || return 1
-  echo "  curled: '${2}' -> '${1}'"
   curl.com "$2" > "$1" 2>/dev/null
+  echo "  curled: '${2}' -> '${1}'"
 }
 
 get_lines ()
