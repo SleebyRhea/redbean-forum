@@ -9,9 +9,10 @@ local push, pop = table.insert, table.remove
 local json_response = require("api.data").json_response
 
 local api = {
-  get  = { directory = {}, thread = {}, post = {} },
-  post = { directory = {}, thread = {}, post = {} },
-  push = { directory = {}, thread = {}, post = {} },
+  get   = { directory = {}, thread = {}, post = {} },
+  post  = { directory = {}, thread = {}, post = {} },
+  push  = { directory = {}, thread = {}, post = {} },
+  patch = { directory = {}, thread = {}, post = {} },
 }
 
 do
@@ -63,6 +64,12 @@ do
   ]])
 end
 
+local insert_directory <const> = [[
+  INSERT INTO directory (
+    name, parent_id
+  ) VALUES (?, ?);
+]]
+
 local insert_thread <const> = [[
   INSERT INTO threads (
     name, parent_id
@@ -86,8 +93,7 @@ local select_directories <const> = [[
   SELECT
     id, name, parent_id
   FROM directory
-  OFFSET ?
-  LIMIT ?;
+  OFFSET ? LIMIT ?;
 ]]
 
 local select_directory_by_id <const> = [[
@@ -104,8 +110,7 @@ local select_directories_by_parent <const> = [[
   FROM directory
   WHERE
     parent_id = ?
-  OFFSET ?
-  LIMIT ?;
+  OFFSET ? LIMIT ?;
 ]]
 
 local select_threads_by_author_id <const> = [[
@@ -118,7 +123,7 @@ local select_threads_by_author_id <const> = [[
     l.id = r.thread_id
   WHERE
     l.author_id = ?
-  LIMIT ? OFFSET ?;
+  OFFSET ? LIMIT ?;
 ]]
 
 local select_posts_by_thread_uuid <const> = [[
@@ -132,7 +137,7 @@ local select_posts_by_thread_uuid <const> = [[
     l.id == r.thread_id
   WHERE
     l.uuid = ?
-  LIMIT ? OFFSET ?;
+  OFFSET ? LIMIT ?;
 ]]
 
 
@@ -189,7 +194,6 @@ local get_directory_by_parent = function (parent_id, offset, limit)
   return directories
 end
 
----comment
 ---@param offset integer
 ---@param limit integer
 ---@return Directory[]
@@ -210,12 +214,25 @@ local get_directory_listing = function (offset, limit)
   return directories
 end
 
-local search_post_by_regex = function (query)
-  local regex = re.compile(query)
+local search_posts_by_regex = function (query, offset, limit)
+  local regex, err = re.compile(query)
+  if not regex then
+    return nil, "invalid regex: " .. tostring(err)
+  end
 end
 
-local search_post_by_description = function (query)
+local search_posts_by_description = function (query)
+end
 
+---@param name string
+---@param parent_id integer?
+---@return boolean
+local create_directory = function (name, parent_id)
+  local db = database.get(unix.getpid(), const.db_name)
+  if db:execute(insert_directory, name, parent_id) < 1 then
+    return false, "failed to create directory"
+  end
+  return true
 end
 
 --
@@ -235,13 +252,13 @@ do --[[ GET methods ]]--
       return json_response(400, "bad request (invalid parameter)")
     end
 
-     return json_response(200, get_directory_listing(offset, limit))
+    return json_response(200, get_directory_listing(offset, limit))
   end
 
   local directory_list_by_parent = function (req)
     local parent_id = req.params.parent_id
-    local offset = req.params.offset or 0
-    local limit = req.params.limit or 15
+    local offset = tonumber(req.params.offset) or 0
+    local limit = tonumber(req.params.limit) or 15
 
     if not parent_id then
       return json_response(400, "bad request")
@@ -262,6 +279,36 @@ do --[[ GET methods ]]--
   api.get.directory.list_by_parent = context(directory_list_by_parent).get_handler()
 end
 
+do --[[ POST methods ]]--
+  ---@param req table
+  local directory_create = function (req)
+    local name = req.params.name
+    local parent = req.params.parent_id
+
+    if not name or type(name) ~= "string" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+    if parent and type(parent) ~= "number" then
+      return json_response(400, "bad request (invalid parameter)")
+    end
+
+    if create_directory(name, parent) then
+      return json_response(200, "success")
+    end
+  end
+
+  api.post.directory.create = context(directory_create)
+    .must_pass(user.require_auth)
+    .must_pass(user.require_admin(1))
+    .get_handler()
+end
+
+do --[[ PATCH methods ]]--
+  local patch_directory_field = function ()
+
+  end
+end
 
 --
 -- THREADS
