@@ -1,10 +1,10 @@
-local fm = require("lib.external.fullmoon")
+local fm = require("lib.fullmoon")
 
 ---@param wrapped_handler fun(req:table): any
 local new = function (wrapped_handler)
 
   ---@class context
-  local self
+  local self = {}
 
   self.get_handler = function ()
     return wrapped_handler
@@ -44,7 +44,9 @@ local new = function (wrapped_handler)
     return self
   end
 
-  return self
+  return setmetatable(self, {
+    __call = self.get_handler
+  })
 end
 
 return {

@@ -1,9 +1,9 @@
-local fm = require("lib.external.fullmoon")
-local get = require("lib.config").get
+local fm = require("lib.fullmoon")
+local get = require("utils.config").get
 local const = require("constants")
-local database = require("lib.database")
-local handlers = require("lib.handlers")
-local GET, POST, PUSH = fm.GET, fm.POST, fm.PUSH
+local database = require("utils.database")
+local handlers = require("utils.handlers")
+local GET, POST, PUSH, PATCH = fm.GET, fm.POST, fm.PUSH, fm.PATCH
 
 fm.setTemplate({ "/tmpl/", fmt = "fmt" })
 fm.setRoute("*", "/assets/*")
@@ -20,14 +20,18 @@ do --[[ /v1/user ]]--
   -- fm.setRoute(PUSH("/v1/user/:field"), uapi.push)
 end
 
+do --[[ /v1/directory ]]
+  local dapi = require("api.post").api
 
-do --[[ /v1/post ]]--
-  local papi = require("api.post")
-  fm.setRoute(GET("/v1/thread/list", papi.get.list))
-  fm.setRoute(GET("/v1/thread/:uuid"), papi.get.uuid)
-  fm.setRoute(GET("/v1/thread/search"), papi.get.list)
-  fm.setRoute(POST("/v1/thread/:uuid/comment"), papi.post)
 end
+
+-- do --[[ /v1/post ]]--
+--   local papi = require("api.post")
+--   fm.setRoute(GET("/v1/thread/list", papi.get.list))
+--   fm.setRoute(GET("/v1/thread/:uuid"), papi.get.uuid)
+--   fm.setRoute(GET("/v1/thread/search"), papi.get.list)
+--   fm.setRoute(POST("/v1/thread/:uuid/comment"), papi.post)
+-- end
 
 do
   if OnWorkerStart then
@@ -61,4 +65,5 @@ do
   end
 end
 
+database.connect(unix.getpid(), const.db_name):execute(Slurp("/zip/data/schema.sqlite"))
 fm.run()

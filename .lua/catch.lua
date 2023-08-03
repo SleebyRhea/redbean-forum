@@ -1,7 +1,7 @@
-local log = require("lib.log")
+local log = require("utils.log")
 local catch_json, log_err, catch
 local need = require("api.need")
-local json_response = require("api.data").json_response
+local json_response = require("utils.data").json_response
 
 do
   local traceback = debug.traceback
@@ -28,7 +28,7 @@ end
 
 
 do
-  local redirect = require("lib.external.fullmoon").serveRedirect
+  local redirect = require("lib.fullmoon").serveRedirect
   local check_ok = function (ok, ...)
     if not ok then
       return redirect(500)

@@ -3,7 +3,7 @@ local handlers = {}
 local only_on_init; do
   local _stub = function () end
   only_on_init = function (fn)
-    if unix.pid() == unix.getppid() then
+    if unix.getpid() == unix.getppid() then
       return fn
     end
     return _stub

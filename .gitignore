@@ -1,4 +1,4 @@
-.lua/lib/external/**
+.lua/lib
 .env
 *.com
 **/*.com

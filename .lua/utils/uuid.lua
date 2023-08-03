@@ -1,3 +1,5 @@
+
+---@return string
 local new_uuid = function ()
   local base
   repeat

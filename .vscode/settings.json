@@ -1,0 +1,7 @@
+{
+  "files.exclude": {
+    "redbean_forum_poc.com": true,
+    "redbean.code-workspace": true,
+    ".gitmodules": true
+  }
+}

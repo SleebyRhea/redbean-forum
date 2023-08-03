@@ -1,6 +1,5 @@
-local fm = require("lib.external.fullmoon")
+local fm = require("lib.fullmoon")
 
----@type
 local handles = {}
 
 local connect = function (pid, db_name)

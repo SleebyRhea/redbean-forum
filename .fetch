@@ -1,4 +1,4 @@
-.lua/lib/external/ansicolors.lua https://raw.githubusercontent.com/kikito/ansicolors.lua/v1.0.2/ansicolors.lua
-.lua/lib/external/argparse.lua   https://raw.githubusercontent.com/luarocks/argparse/0.7.1/src/argparse.lua
-.lua/lib/external/basename.lua   https://raw.githubusercontent.com/mah0x211/lua-basename/master/basename.lua
-.lua/lib/external/fullmoon.lua   https://raw.githubusercontent.com/pkulchenko/fullmoon/master/fullmoon.lua
+.lua/lib/ansicolors.lua https://raw.githubusercontent.com/kikito/ansicolors.lua/v1.0.2/ansicolors.lua
+.lua/lib/argparse.lua   https://raw.githubusercontent.com/luarocks/argparse/0.7.1/src/argparse.lua
+.lua/lib/basename.lua   https://raw.githubusercontent.com/mah0x211/lua-basename/master/basename.lua
+.lua/lib/fullmoon.lua   https://raw.githubusercontent.com/pkulchenko/fullmoon/master/fullmoon.lua

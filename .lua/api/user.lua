@@ -4,124 +4,31 @@
 ---@field uuid       string
 ---@field name       string
 
-local fm = require("lib.external.fullmoon")
-local need = require("lib.need")
+local fm = require("lib.fullmoon")
+local need = require("utils.need")
 local const = require("constants")
-local new_uuid = require("lib.uuid").new
+local queries = require("constants.queries")
+local new_uuid = require("uuid").new
 local context = require("context").new
-local database = require("lib.database")
-local json_response = require("api.data").json_response
+local database = require("utils.database")
+local json_response = require("utils.data").json_response
 local validate = require("lib.validation").validate
-local api = { get = {}, push = {}, post = {} }
-local register_cfg = require("lib.config").register
+local api = require("api.api_class")("user")
 
 local cUserPasswordRegex = "user.password_regex"
 
 do
+  local register_cfg = require("utils.config").register
   register_cfg(cUserPasswordRegex, "")
 end
 
-do
-  local db = database.get(unix.getpid(), const.db_name)
-  db:execute([[
-    CREATE TABLE IF NOT EXISTS users (
-      id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
-      uuid        TEXT      NOT NULL      UNIQUE,
-      created_on  INTEGER   NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS user_settings (
-      id            INTEGER   PRIMARY KEY   AUTOINCREMENT,
-      user_id       INTEGER   NOT NULL      UNIQUE,
-      name          TEXT      NOT NULL      UNIQUE,
-      auth          TEXT      NOT NULL,
-      email         TEXT      NOT NULL      UNIQUE,
-      email_visible INTEGER   NOT NULL,
-
-      FOREIGN KEY(author_id) REFERENCES users(id),
-    );
-  ]])
-end
-
-local update_usersettings_query <const> = [[
-  UPDATE user_settings SET
-    ? = ?
-  WHERE
-    uuid = ?
-  LIMIT 1;
-]]
-
-local create_user_query <const> = [[
-  INSERT INTO users (
-    uuid,
-    created_on
-  ) VALUES (?, ?);
-]]
-
-local create_usersettings_query <const> = [[
-  INSERT INTO user_settings (
-    user_id,
-    name,
-    auth,
-    email,
-    email_visible
-  ) VALUES (?, ?, ?, ?, ?);
-]]
-
-local select_user_query <const> = [[
-  SELECT
-    id
-  FROM
-    users
-  WHERE
-    uuid = ?
-  LIMIT 1;
-]]
-
-local select_userauth_query_by_id <const> = [[
-  SELECT
-    auth
-  FROM
-    user_settings
-  WHERE
-    user_id = ?
-  LIMIT 1;
-]]
-
-
-local select_userdata_query_by_uuid <const> = [[
-  SELECT
-    l.id              AS id,
-    l.uuid            AS uuid,
-    r.name            AS name,
-    r.email           AS email,
-    r.email_visible   AS email_visible,
-    l.created_on      AS created_on
-  FROM
-    users l
-  INNER JOIN user_settings r ON
-    l.id = r.user_id
-  WHERE
-    l.uuid = ?
-  LIMIT 1;
-]]
-
-local select_userdata_query_by_name <const> = [[
-  SELECT
-    l.id              AS id,
-    l.uuid            AS uuid,
-    r.name            AS name,
-    r.email           AS email,
-    r.email_visible   AS email_visible,
-    l.created_on      AS created_on
-  FROM
-    users l
-  INNER JOIN user_settings r ON
-    l.id = r.user_id
-  WHERE
-    r.name = ?
-  LIMIT 1;
-]]
+local qc_user <const> = queries.insert.user
+local qc_usersettings <const> = queries.insert.user_settings
+local qs_user_by_uuid <const> = queries.select.user_by_uuid
+local qs_userauth_by_id <const> = queries.select.userauth_by_id
+local qs_userdata_by_uuid <const> = queries.select.userdata_by_uuid
+local qs_userdata_by_name <const> = queries.select.userdata_by_name
+local qu_usersettings_by_uuid <const> = queries.update.usersettings_by_uuid
 
 local require_auth = function (req)
   if (not req.session.authenticated)
@@ -147,7 +54,7 @@ local user_by_uuid = function (uuid)
   local id, created_on, name, email, email_visible
   do
     local db = database.get(unix.getpid(), const.db_name)
-    local result = db:fetchOne(select_userdata_query_by_uuid, uuid)
+    local result = db:fetchOne(qs_userdata_by_uuid, uuid)
     if not result or not result.id then
       return nil
     end
@@ -178,7 +85,7 @@ local user_by_name = function (name)
   do
     local db = database.get(unix.getpid(), const.db_name)
 
-    local result = db:fetchOne(select_userdata_query_by_name, name)
+    local result = db:fetchOne(qs_userdata_by_name, name)
     if not result or not result.id then
       return nil
     end
@@ -237,14 +144,14 @@ local create_user = function (username, email, password)
     local user_id = -1
 
     do
-      local _, err = db:execute(create_user_query, uuid, GetTime())
+      local _, err = db:execute(qc_user, uuid, GetTime())
       if err then
         return false, err
       end
     end
 
     do
-      local result, err = db:fetchOne(select_user_query, uuid)
+      local result, err = db:fetchOne(qs_user_by_uuid, uuid)
       if not result then
         return false, err
       end
@@ -252,7 +159,7 @@ local create_user = function (username, email, password)
     end
 
     do
-      local _, err = db:execute(create_usersettings_query, user_id, username, hash, email, false)
+      local _, err = db:execute(qc_usersettings, user_id, username, hash, email, false)
       if err then
         return false, err
       end
@@ -276,7 +183,7 @@ do
       end
     end
 
-    local _, err = db:execute(update_usersettings_query, "name", value, uuid)
+    local _, err = db:execute(qu_usersettings_by_uuid, "name", value, uuid)
 
     if not err then
       return false, err
@@ -295,7 +202,7 @@ do
     end
 
     local hash = argon2.hash_encoded(value, EncodeBase64(GetRandomBytes(32)))
-    local _, err = db:execute(update_usersettings_query, "auth", hash, uuid)
+    local _, err = db:execute(qu_usersettings_by_uuid, "auth", hash, uuid)
 
     if not err then
       return false, err
@@ -306,7 +213,7 @@ do
 
 
   handlers.email = function (db, uuid, value)
-    local _, err = db:execute(update_usersettings_query, "email", value, uuid)
+    local _, err = db:execute(qu_usersettings_by_uuid, "email", value, uuid)
 
     if err then
       return false, err
@@ -433,7 +340,7 @@ do -- [[ GET methods ]]
     end
 
     local db = database.get(unix.getpid(), const.db_name)
-    local result = db:fetchOne(select_userauth_query_by_id, id)
+    local result = db:fetchOne(qs_userauth_by_id, id)
     if not result then
       return json_response(403, "unauthorized")
     end
@@ -450,10 +357,10 @@ do -- [[ GET methods ]]
     return json_response(200, "success")
   end
 
-  api.get.self = context(want_self).must_pass(require_auth).get_handler()
-  api.get.by_uuid = context(by_uuid).must_pass(require_auth).get_handler()
-  api.get.by_name = context(by_name).must_pass(require_auth).get_handler()
-  api.get.by_email = context(by_email).must_pass(require_auth).get_handler()
+  api.get.self = context(want_self).must_pass(require_auth)()
+  api.get.by_uuid = context(by_uuid).must_pass(require_auth)()
+  api.get.by_name = context(by_name).must_pass(require_auth)()
+  api.get.by_email = context(by_email).must_pass(require_auth)()
   api.get.authenticate = authenticate
 end
 
@@ -474,7 +381,7 @@ do --[[ POST methods ]]
     end
   end
 
-  api.post.register = context(register_user).get_handler()
+  api.post.register = context(register_user)()
 end
 
 
@@ -496,7 +403,7 @@ do --[[ PUSH methods ]]
     return json_response(200, "success")
   end
 
-  api.push.update = context(update).must_pass(require_auth).get_handler()
+  api.push.update = context(update).must_pass(require_auth)()
 end
 
 return {

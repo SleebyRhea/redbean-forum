@@ -1,10 +1,10 @@
-local fm = require("lib.external.fullmoon")
-local get = require("lib.config").get
+local fm = require("lib.fullmoon")
+local get = require("utils.config").get
 local log = require("lib.logging")
-local ulib = require("lib.uuid").new
-local need = require("lib.need")
+local ulib = require("uuid").new
+local need = require("utils.need")
 local const = require("constants")
-local database = require("lib.database")
+local database = require("utils.database")
 
 local cAttachmentsEnabled = "attachments.enabled"
 local cAttachmentsUploadPath = "attachments.upload_filepath"
@@ -12,26 +12,11 @@ local cAttachmentsMaxUploadSize = "attachments.max_upload_size"
 local cAttachmentsCleanupSchedule = "attachments.cleanup_schedule"
 
 do
-  local register_cfg = require("lib.config").register
+  local register_cfg = require("utils.config").register
   register_cfg(cAttachmentsEnabled, true)
   register_cfg(cAttachmentsUploadPath, "uploads")
   register_cfg(cAttachmentsMaxUploadSize, 50 * 1024 * 1024) -- 50MB default
   register_cfg(cAttachmentsCleanupSchedule, "*/30 * * * *")
-end
-
-do
-  local db = database.get(unix.getpid(), const.db_name)
-  db:execute([[
-    CREATE TABLE IF NOT EXISTS attachments (
-      id            INTEGER   PRIMARY KEY   AUTOINCREMENT,
-      uuid          TEXT      NOT NULL,
-      post_id       INTEGER   NOT NULL,
-      filename      TEXT      NOT NULL,
-      description   TEXT,
-
-      FOREIGN KEY(post_id) REFERENCES threads(id),
-    );
-  ]])
 end
 
 local insert_attachment <const> = [[

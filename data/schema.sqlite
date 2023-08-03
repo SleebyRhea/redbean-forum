@@ -1,0 +1,70 @@
+CREATE TABLE IF NOT EXISTS users (
+  id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  uuid        TEXT      NOT NULL      UNIQUE,
+  created_on  INTEGER   NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  id            INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  user_id       INTEGER   NOT NULL      UNIQUE,
+  name          TEXT      NOT NULL      UNIQUE,
+  auth          TEXT      NOT NULL,
+  email         TEXT      NOT NULL      UNIQUE,
+  email_visible INTEGER   NOT NULL,
+
+  FOREIGN KEY(author_id) REFERENCES users(id),
+);
+
+CREATE TABLE IF NOT EXISTS directory (
+  id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  name        TEXT      NOT NULL,
+  parent_id   INTEGER,  -- the parent directory id is used to allow directories
+                        -- to be a child of another directory. if there is no
+                        -- parent_id (parent_id = NULL) then it is in the root
+                        -- of the directory tree
+);
+
+CREATE TABLE IF NOT EXISTS threads (
+  id            INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  uuid          TEXT      NOT NULL      UNIQUE,
+  name          TEXT      NOT NULL,
+  author_id     TEXT      NOT NULL,
+  created_on    INTEGER   NOT NULL,
+  updated_on    INTEGER   NOT NULL,
+  directory_id  INTEGER   NOT NULL,
+
+  FOREIGN KEY(author_id) REFERENCES users(id),
+  FOREIGN KEY(directory_id) REFERENCES directory(id),
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+  id          INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  uuid        TEXT      NOT NULL      UNIQUE,
+  body        TEXT      NOT NULL,
+  thread_id   INTEGER   NOT NULL,
+  author_id   INTEGER   NOT NULL,
+  extra_data  TEXT,
+
+  FOREIGN KEY(author_id) REFERENCES users(id),
+  FOREIGN KEY(thread_id) REFERENCES threads(id),
+);
+
+CREATE TABLE IF NOT EXISTS reactions (
+  id          INTEGER   PRIMARY KEY  AUTOINCREMENT,
+  post_id     INTEGER   NOT NULL,
+  author_id   INTEGER   NOT NULL,
+  emoji       TEXT,
+
+  FOREIGN KEY(author_id) REFERENCES users(id),
+  FOREIGN KEY(post_id) REFERENCES threads(id),
+);
+
+CREATE TABLE IF NOT EXISTS attachments (
+  id            INTEGER   PRIMARY KEY   AUTOINCREMENT,
+  uuid          TEXT      NOT NULL,
+  post_id       INTEGER   NOT NULL,
+  filename      TEXT      NOT NULL,
+  description   TEXT,
+
+  FOREIGN KEY(post_id) REFERENCES threads(id),
+);

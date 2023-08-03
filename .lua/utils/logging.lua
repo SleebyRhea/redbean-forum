@@ -1,5 +1,5 @@
 local color = require("lib.ansicolors")
-local need = require("lib.need")
+local need = require("utils.need")
 local fmt = string.format
 
 ---@param msg string
