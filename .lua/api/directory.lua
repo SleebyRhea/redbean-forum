@@ -1,7 +1,7 @@
 local api = require("api.api_class")("directory")
 local need = require("utils.need")
 local uapi = require("api.user")
-local context = require("context")
+local context = require("utils.context")
 local const = require("constants")
 local queries = require("constants.queries")
 local database <const> = require("utils.database")

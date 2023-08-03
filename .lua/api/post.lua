@@ -1,6 +1,6 @@
 local api = require("api.api_class")("post")
 local queries = require("constants.queries")
-local context = require("context").new
+local context = require("utils.context").new
 
 local uapi = require("api.user")
 local json_response = require("utils.data").json_response
