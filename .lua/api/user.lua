@@ -8,11 +8,11 @@ local fm = require("lib.fullmoon")
 local need = require("utils.need")
 local const = require("constants")
 local queries = require("constants.queries")
-local new_uuid = require("uuid").new
-local context = require("utils.context").new
+local new_uuid = require("utils.uuid").new
+local endpoint = require("utils.endpoint").new
 local database = require("utils.database")
 local json_response = require("utils.data").json_response
-local validate = require("lib.validation").validate
+local validate = require("utils.validation").validate
 local api = require("api.api_class")("user")
 
 local cUserPasswordRegex = "user.password_regex"
@@ -169,11 +169,10 @@ local create_user = function (username, email, password)
   return true
 end
 
-
 local update_user
+
 do
   local handlers = {}
-
 
   handlers.username = function (db, uuid, value)
     do
@@ -185,7 +184,7 @@ do
 
     local _, err = db:execute(qu_usersettings_by_uuid, "name", value, uuid)
 
-    if not err then
+    if err then
       return false, err
     end
 
@@ -204,7 +203,7 @@ do
     local hash = argon2.hash_encoded(value, EncodeBase64(GetRandomBytes(32)))
     local _, err = db:execute(qu_usersettings_by_uuid, "auth", hash, uuid)
 
-    if not err then
+    if err then
       return false, err
     end
 
@@ -221,7 +220,6 @@ do
 
     return true
   end
-
 
   ---Update a user value
   ---@param uuid string
@@ -250,7 +248,7 @@ do -- [[ GET methods ]]
   ---get a user by their UUID
   ---@param req table
   ---@return any
-  local by_uuid = function (req)
+  local public_by_uuid = function (req)
     local uuid = req.params.uuid
     if not uuid then
       return json_response(400, "bad request")
@@ -268,7 +266,7 @@ do -- [[ GET methods ]]
   ---get a user by their email
   ---@param req table
   ---@return any
-  local by_email = function (req)
+  local public_by_email = function (req)
     local uuid = req.params.uuid
     if not uuid then
       return json_response(400, "bad request")
@@ -286,7 +284,7 @@ do -- [[ GET methods ]]
   ---get a user by their name
   ---@param req table
   ---@return any
-  local by_name = function (req)
+  local public_by_name = function (req)
     local name = req.params.name
     if not name then
       return json_response(400, "bad request")
@@ -303,21 +301,17 @@ do -- [[ GET methods ]]
 
   ---@param req any
   ---@return string|nil
-  local want_self = function (req)
+  local public_want_self = function (req)
     return json_response(200, req.session.user)
   end
 
 
   ---@return unknown
-  local authenticate = function (req)
+  local public_authenticate = function (req)
     local user --[[@as User]]
     local id --[[@as integer]]
     local login = req.params.login
     local passw = req.params.password
-
-    if (not login) or (not passw) then
-      return json_response(403, "unauthorized")
-    end
 
     if not user then
       local attempt, attempt_id = user_by_name(login)
@@ -350,18 +344,28 @@ do -- [[ GET methods ]]
     end
 
     req.session.authenticated = true
-    req.session.context = {
+    req.session.endpoint = {
       user = user,
     }
 
     return json_response(200, "success")
   end
 
-  api.get.self = context(want_self).must_pass(require_auth)()
-  api.get.by_uuid = context(by_uuid).must_pass(require_auth)()
-  api.get.by_name = context(by_name).must_pass(require_auth)()
-  api.get.by_email = context(by_email).must_pass(require_auth)()
-  api.get.authenticate = authenticate
+  api.get.self = endpoint(public_want_self)
+    .must_pass(require_auth)()
+
+  api.get.by_uuid = endpoint(public_by_uuid)
+    .has_param("uuid", "string")()
+
+  api.get.by_name = endpoint(public_by_name)
+    .has_param("name", "string")()
+
+  api.get.by_email = endpoint(public_by_email)
+    .has_param("email", "string")()
+
+  api.get.authenticate = endpoint(public_authenticate)
+    .has_param("login", "string")
+    .has_param("password", "string")()
 end
 
 
@@ -371,21 +375,20 @@ do --[[ POST methods ]]
     local username = req.params.username
     local password = req.params.password
 
-    if not (email and username and password) then
-      return json_response(400, "bad request")
-    end
-
     local ok, err = create_user(username, email, password)
     if not ok then
       return json_response(401, err)
     end
   end
 
-  api.post.register = context(register_user)()
+  api.post.register = endpoint(register_user)
+    .has_param("username", "string")
+    .has_param("password", "string")
+    .has_param("email", "string")()
 end
 
 
-do --[[ PUSH methods ]]
+do --[[ PATCH methods ]]
   local update = function (req)
     local uuid = req.session.context.user.uuid
     local field = req.params.field
@@ -403,7 +406,7 @@ do --[[ PUSH methods ]]
     return json_response(200, "success")
   end
 
-  api.push.update = context(update).must_pass(require_auth)()
+  api.patch.update = endpoint(update).must_pass(require_auth)()
 end
 
 return {
@@ -413,4 +416,5 @@ return {
   user_by_uuid = need(user_by_uuid, "string"),
   user_by_name = need(user_by_name, "string"),
   create_user = need(create_user, "string", "string", "string"),
+  update_user = need(update_user, "string", "string")
 }
