@@ -6,11 +6,11 @@ local new_api <const> = function (name)
   end
 
   local self = {
-    get    = { directory = {}, thread = {}, post = {} },
-    post   = { directory = {}, thread = {}, post = {} },
-    push   = { directory = {}, thread = {}, post = {} },
-    patch  = { directory = {}, thread = {}, post = {} },
-    delete = { directory = {}, thread = {}, post = {} },
+    get    = {},
+    post   = {},
+    push   = {},
+    patch  = {},
+    delete = {},
   }
 
   setmetatable(self, {
