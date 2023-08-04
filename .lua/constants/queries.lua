@@ -40,9 +40,9 @@ queries.insert.thread = [[
 
 queries.insert.post = [[
   INSERT INTO posts (
-    uuid,       name,       author_id,
-    created_on, updated_on, directory_id
-  ) VALUES ( ?, ?, ?, ?, ?, ? );
+    uuid,       body,       author_id,
+    created_on, updated_on
+  ) VALUES ( ?, ?, ?, ?, ? );
 ]]
 
 queries.insert.reaction = [[
@@ -146,6 +146,17 @@ queries.select.directories_by_name = [[
   WHERE
     name = ?
   OFFSET ? LIMIT ?;
+]]
+
+queries.select.post_by_uuid = [[
+  SELECT
+    id, uuid, body, thread_id,
+    author_id,  created_on,
+    updated_on, extra_data
+  FROM posts
+  WHERE
+    uuid = ?
+  LIMIT 1;
 ]]
 
 queries.select.posts_by_thread_uuid = [[
