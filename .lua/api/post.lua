@@ -1,12 +1,32 @@
 local api = require("api.api_class")("post")
-local queries = require("constants.queries")
-local context = require("utils.context").new
-
 local uapi = require("api.user")
+local need = require("utils.need")
+local new_uuid = require("utils.uuid").new
+local queries = require("constants.queries")
+local endpoint = require("utils.endpoint").new
 local json_response = require("utils.data").json_response
+local database = require("utils.database")
+local const = require("constants")
 
-local q_insert <const> = queries.insert.post
-local q_by_thread_uuid_query <const> = queries.select.posts_by_thread_uuid
+local qc_post <const> = queries.insert.post
+local qs_by_uuid <const> = queries.select.post_by_uuid
+local qs_by_thread_uuid <const> = queries.select.posts_by_thread_uuid
+
+local create_post = function (body, thread_id, author_id)
+  local uuid = new_uuid()
+  local id, post
+  local now = GetTime()
+
+  do
+    local db = database.get(unix.getpid(), const.db_name)
+    local c, err = db:execute(qc_post, uuid, body, author_id, now, now)
+    if c < 1 then
+      return false, "failed to create post: " .. tostring(err)
+    end
+  end
+
+  return true
+end
 
 local search_posts_by_regex = function (query, offset, limit)
   local regex, err = re.compile(query)
@@ -19,56 +39,38 @@ local search_posts_by_description = function (query)
 end
 
 
---
--- THREADS
---
-
 do --[[ GET methods ]]--
-  local thread_search = function (req)
+  local public_by_uuid = function (req)
   end
 
-  local thread_by_author_uuid = function (req)
+  local public_by_thread = function (req)
   end
 
-  local thread_list_by_author = function (req)
+  local public_list_by_author = function (req)
   end
 
-  local thread_list_all_threads = function (req)
+  local public_search = function (req)
   end
-
-  api.get.thread.search = context(thread_search)()
-  api.get.thread.by_uuid = context(thread_by_author_uuid).must_pass(uapi.require_auth)()
-  api.get.thread.list_all = context(thread_list_all_threads).must_pass(uapi.require_auth)()
-  api.get.thread.list_by_author = context(thread_list_by_author).must_pass(uapi.require_auth)()
 end
 
 
 do --[[ POST methods ]]--
-
-end
-
-
---
--- POSTS
---
-
-do --[[ GET methods ]]--
-  local post_by_uuid = function (req)
+  local public_create_post = function (req)
+    local ok, err = create_post(req.params.body, req.params.thread_id, req.params.author_id)
+    if not ok
+      then return json_response(500, err)
+      else return json_response(200, "success")
+    end
   end
 
-  local post_by_thread = function (req)
-  end
-
-  local post_list_by_author = function (req)
-  end
-
-  local post_search = function (req)
-  end
-end
-
-do --[[ POST methods ]]--
+  api.post.create_post = endpoint(public_create_post)
+    .must_pass(uapi.require_auth)
+    .has_param("body", "string")
+    .has_param("thread_id", "number")
+    .has_param("author_id", "number")()
 end
 
 return {
-  api
+  api = api,
+  create_post = need(create_post, "string", "number", "number")
 }
