@@ -1,11 +1,12 @@
 local api = require("api.api_class")("directory")
 local need = require("utils.need")
 local uapi = require("api.user")
-local context = require("utils.context")
+local endpoint = require("utils.endpoint")
 local const = require("constants")
 local queries = require("constants.queries")
 local database <const> = require("utils.database")
 local json_response = require("utils.data").json_response
+local logging       = require("utils.logging")
 local push, pop = table.insert, table.remove
 
 local insert_directory_query <const> = queries.insert.directory
@@ -139,7 +140,15 @@ local update_directory = function (id, field, value)
 end
 
 do --[[ GET methods ]]--
-  local get_directory_list_all = function (req)
+  local public_by_id = function (req)
+    local found = get_directory_by_id(req.params.id)
+    if not found then
+      return json_response(404, "no such directory")
+    end
+    return json_response(200, "success")
+  end
+
+  local public_list_all = function (req)
     local offset = req.params.offset or 0
     local limit = req.params.limit or 15
 
@@ -154,11 +163,11 @@ do --[[ GET methods ]]--
     return json_response(200, get_directory_listing(offset, limit))
   end
 
-  local get_directory_by_name = function (req)
+  local public_list_by_name = function (req)
     return json_response(403, "unimplemented")
   end
 
-  local get_directory_list_by_parent = function (req)
+  local public_list_by_parent = function (req)
     local parent_id = req.params.parent_id
     local offset = tonumber(req.params.offset) or 0
     local limit = tonumber(req.params.limit) or 15
@@ -178,17 +187,24 @@ do --[[ GET methods ]]--
     return json_response(200, get_directory_listing_by_parent(parent_id, offset, limit))
   end
 
-  api.get.list_all = context(get_directory_list_all)()
-  api.get.list_by_parent = context(get_directory_list_by_parent)()
-  api.get.list_by_name = context(get_directory_by_name)()
+  api.get.by_id = endpoint.new(public_by_id).has_param("id", "number")()
+  api.get.list_all = endpoint.new(public_list_all)()
+  api.get.list_by_parent = endpoint.new(public_list_by_parent).has_param("parent_id", "number")()
+  api.get.list_by_name = endpoint.new(public_list_by_name).has_param("name", "string")()
 end
 
 
 do --[[ POST methods ]]--
   ---@param req table
   local post_directory_create = function (req)
-    local name = req.params.name
-    local parent = req.params.parent_id
+    local data, err = DecodeJson(req.body)
+    local name = data.name
+    local parent = data.parent_id
+
+    if not data then
+      logging.error("failed to parse json for request: " .. tostring(err))
+      return json_response(400, "bad request (invalid json body)")
+    end
 
     if not name or type(name) ~= "string" then
       return json_response(400, "bad request (invalid parameter)")
@@ -203,10 +219,11 @@ do --[[ POST methods ]]--
     end
   end
 
-  api.post.create = context(post_directory_create)
+  api.post.create = endpoint.new(post_directory_create)
     .must_pass(uapi.require_auth)
-    .must_pass(uapi.require_admin(1))
-    ()
+    .must_pass(endpoint.middleware.require_body)
+    .must_pass(endpoint.middleware.require_content("application/json"))
+    .must_pass(uapi.require_admin(1))()
 end
 
 
@@ -227,10 +244,9 @@ do --[[ PATCH methods ]]--
     return json_response(200, update_directory(id, field, value))
   end
 
-  api.patch.update = context(patch_update_directory_field)
+  api.patch.update = endpoint.new(patch_update_directory_field)
     .must_pass(uapi.require_auth)
-    .must_pass(uapi.require_admin(1))
-    ()
+    .must_pass(uapi.require_admin(1))()
 end
 
 return {
