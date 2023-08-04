@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS posts (
   body        TEXT      NOT NULL,
   thread_id   INTEGER   NOT NULL,
   author_id   INTEGER   NOT NULL,
+  created_on  INTEGER   NOT NULL,
+  updated_on  INTEGER   NOT NULL,
   extra_data  TEXT,
 
   FOREIGN KEY(author_id) REFERENCES users(id),
