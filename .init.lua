@@ -12,17 +12,19 @@ do --[[ /v1/user ]]--
   local uapi = require("api.user").api
   fm.setRoute(GET("/v1/user/authenticate"), uapi.get.authenticate)
   fm.setRoute(GET("/v1/user"), uapi.get.self)
-  fm.setRoute(GET({"/v1/user/:uuid", uuid = {regex = const.uuid_regex}}), uapi.get.by_uuid)
-  fm.setRoute(GET({"/v1/user/:email", email = {regex = const.email_regex}}), uapi.get.by_email)
+  fm.setRoute(GET{"/v1/user/:uuid", uuid = {regex = const.uuid_regex}}, uapi.get.by_uuid)
+  fm.setRoute(GET{"/v1/user/:email", email = {regex = const.email_regex}}, uapi.get.by_email)
   fm.setRoute(GET("/v1/user/:name"), uapi.get.by_name)
-
   fm.setRoute(POST("/v1/user/register"), uapi.post.register)
-  -- fm.setRoute(PUSH("/v1/user/:field"), uapi.push)
+  fm.setRoute(PATCH("/v1/user/:field"), uapi.patch.update)
 end
 
 do --[[ /v1/directory ]]
-  local dapi = require("api.post").api
-
+  local dapi = require("api.directory").api
+  fm.setRoute(POST"/v1/directory", dapi.post.create)
+  fm.setRoute(GET{"/v1/directory/:id", id = { regex = const.id_regex_str }}, dapi.get.by_id)
+  fm.setRoute(GET("/v1/directory/by_name/:name"), dapi.get.list_by_name)
+  fm.setRoute(GET{"/v1/directory/by_parent/:id", id = { regex = const.id_regex_str }}, dapi.get.list_by_name)
 end
 
 -- do --[[ /v1/post ]]--
